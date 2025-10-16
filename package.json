@@ -9,6 +9,7 @@
     "build": "electron-builder",
     "build:win": "electron-builder --win portable",
     "build:linux": "electron-builder --linux AppImage",
+    "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win portable --linux AppImage",
     "make": "npm run build:win"
   },
@@ -18,6 +19,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "dmg-builder": "^24.13.3",
     "electron": "^25.0.0",
     "electron-builder": "^24.0.0"
   },
@@ -27,11 +29,13 @@
     "directories": {
       "output": "dist"
     },
-  "extraResources": [
+    "extraResources": [
       {
         "from": "resources/",
         "to": ".",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "files": [
@@ -45,6 +49,25 @@
     "linux": {
       "target": "AppImage",
       "artifactName": "AIMS-Desktop.AppImage"
+    },
+    "mac": {
+      "target": "zip",
+      "artifactName": "AIMS-Desktop-macOS.zip"
+    },
+    "dmg": {
+      "sign": false,
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   },
   "dependencies": {

@@ -6,7 +6,8 @@ const { EventEmitter } = require('events');
 const { app } = require('electron');
 const fs = require('fs');
 const { getLogger } = require('../utils/logger');
-
+const util = require('util');
+const execAsync = util.promisify(require('child_process').exec);
 class ServiceManager extends EventEmitter {
   constructor() {
     super();
@@ -165,12 +166,12 @@ class ServiceManager extends EventEmitter {
     this.logger.info('   app.getAppPath():', app.getAppPath());
     this.logger.info('   process.resourcesPath:', process.resourcesPath);
     this.logger.info('   process.execPath:', process.execPath);
-    let debugmessage= "   currentDir: " + currentDir + "\n";
-    debugmessage += "   parentDir: " + parentDir + "\n";
-    debugmessage += "   __dirname: " + __dirname + "\n";
-    debugmessage += "   app.getAppPath(): " + app.getAppPath() + "\n";
-    debugmessage += "   process.resourcesPath: " + process.resourcesPath + "\n";
-    debugmessage += "   process.execPath: " + process.execPath + "\n";
+    // let debugmessage= "   currentDir: " + currentDir + "\n";
+    // debugmessage += "   parentDir: " + parentDir + "\n";
+    // debugmessage += "   __dirname: " + __dirname + "\n";
+    // debugmessage += "   app.getAppPath(): " + app.getAppPath() + "\n";
+    // debugmessage += "   process.resourcesPath: " + process.resourcesPath + "\n";
+    // debugmessage += "   process.execPath: " + process.execPath + "\n";
 
     return {
       backend: {
@@ -183,22 +184,22 @@ class ServiceManager extends EventEmitter {
         color: '🔵',
         required: true
       },
-      nodeodm: {
-        name: 'NodeODM',
-        path: path.join(parentDir, 'NodeODM'),
-        port: 3001,
-        healthEndpoint: '/info',
-        startCommand: 'npm',
-        startArgs: ['start'],
-        color: '🟡',
-        required: false
-      },
+      // nodeodm: {
+      //   name: 'NodeODM',
+      //   path: path.join(parentDir, 'NodeODM'),
+      //   port: 3001,
+      //   healthEndpoint: '/info',
+      //   startCommand: 'npm',
+      //   startArgs: ['start'],
+      //   color: '🟡',
+      //   required: false
+      // },
       frontend: {
         name: 'Frontend', 
         path: path.join(currentDir, '/aims-frontend'),
         port: 3004,
         healthEndpoint: '/',
-        startCommand: 'node',
+        startCommand: 'PORT=3004 node',
         startArgs: ['server.js'],
         color: '🟢',
         required: true
@@ -218,6 +219,113 @@ class ServiceManager extends EventEmitter {
     }
   }
 
+  async runDockerCommand(args) {
+    return new Promise((resolve, reject) => {
+      const docker = spawn('docker', args);
+
+      let stdout = '';
+      let stderr = '';
+
+      docker.stdout.on('data', (data) => { stdout += data.toString(); });
+      docker.stderr.on('data', (data) => { stderr += data.toString(); });
+
+      docker.on('close', (code) => {
+        if (code === 0) resolve(stdout.trim());
+        else reject(new Error(stderr || `Docker exited with code ${code}`));
+      });
+    });
+  }
+
+  // Add NodeODM Docker functions
+  async startNodeODMDocker() {
+    const dockerImage = 'opendronemap/nodeodm:latest';
+    const containerName = 'AimsAi';
+    const hostPort = 3001;
+    const containerPort = 3000;
+    
+    try {
+      this.logger.info('🐳 Starting NodeODM with Docker...');
+      
+      // Check if Docker is available
+      try {
+        await execAsync('docker --version');
+        this.logger.info('✅ Docker is available');
+      } catch (error) {
+        throw new Error('Docker is not installed or not accessible');
+      }
+// Stop and remove existing container if it exists
+      try {
+        await execAsync(`docker stop ${containerName}`);
+        await execAsync(`docker rm ${containerName}`);
+        this.logger.info('🗑️ Removed existing NodeODM container');
+      } catch (error) {
+        this.logger.info('ℹ️ No existing container to remove');
+      }
+
+      // Pull latest NodeODM image
+      this.logger.info('📥 Pulling NodeODM Docker image...');
+      this.emit('service-status', 'nodeodm', 'starting', 'Pulling Docker image...');
+      
+      try {
+        await execAsync(`docker pull ${dockerImage}`);
+        this.logger.info('✅ NodeODM image pulled successfully');
+      } catch (error) {
+        this.logger.warn('⚠️ Failed to pull image, using existing local image');
+      }
+
+      // Create data directories for persistence
+      const userDataPath = app.getPath('userData');
+      const AimsAiDataDir = path.join(userDataPath, 'aims-ai-data');
+      
+      if (!fs.existsSync(AimsAiDataDir)) {
+        fs.mkdirSync(AimsAiDataDir, { recursive: true });
+        this.logger.info(`📁 Created aims-ai data directory: ${AimsAiDataDir}`);
+      }
+      // Start NodeODM container
+      const dockerArgs = [
+       'run', '-d',
+      '--name', containerName,
+      '-p', `${hostPort}:${containerPort}`,
+      // '-v', `${AimsAiDataDir}:/var/www/data`, // This path is now safe
+      '--restart', 'unless-stopped',
+      '--memory', '4g',
+      '--cpus', '2',
+      dockerImage,
+      '--max-images', '1000',
+      '--max-parallel-tasks', '1',
+      '--cleanup-uploads-after', '3',
+      '--max-concurrency', '2'
+    ];
+
+      this.logger.info(`🚀 Starting AimsAi container: docker ${dockerArgs.join(' ')}`);
+      this.emit('service-status', 'AimsAi', 'starting', 'Starting Docker container...');
+
+      const { stdout: containerId } = await this.runDockerCommand(dockerArgs); 
+      // execAsync(`docker ${dockerArgs.join(' ')}`);
+      
+      // this.logger.info(`✅ AimsAi container started with ID: ${containerId.trim()}`);
+      
+      // Store container info
+      // this.dockerContainers.set('AimsAi', {
+      //   containerId: containerId.trim(),
+      //   containerName,
+      //   port: hostPort,
+      //   startTime: Date.now()
+      // });
+ // Wait for AimsAi to be ready
+      // await this.waitForNodeODMReady(hostPort);
+
+      this.emit('service-status', 'aims-ai', 'running', 'AimsAi Docker container is ready!');
+      this.logger.info('🎉 AimsAi Docker container is ready!');
+
+      return true;
+
+    } catch (error) {
+      this.logger.error('❌ Failed to start AimsAi Docker container:', error.message);
+      this.emit('service-status', 'aims-ai', 'error', `Docker start failed: ${error.message}`);
+      throw error;
+    }
+  }
   async startService(serviceKey, serviceConfig) {
     this.logger.info(`Starting service: ${serviceKey}`,serviceConfig);
     this.logger.info('currentDir:', process.cwd());
@@ -236,7 +344,7 @@ class ServiceManager extends EventEmitter {
 
         // Check if path exists
         if (!fs.existsSync(serviceConfig.path)) {
-          const error = `Path not found: ${serviceConfig.path} `+debugmessage;
+          const error = `Path not found: ${serviceConfig.path} `;
           console.error(`${serviceConfig.color} ${serviceConfig.name}: ${error}`);
           this.emit('service-status', serviceKey, 'error', error);
           if (!serviceConfig.required) {
@@ -348,7 +456,8 @@ class ServiceManager extends EventEmitter {
       
       // Start NodeODM (optional)
       try {
-        await this.startService('nodeodm', servicePaths.nodeodm);
+        await this.startNodeODMDocker()
+        // await this.startService('nodeodm', servicePaths.nodeodm);
         this.emit('startup-progress', 70, 'NodeODM ready, starting frontend...');
       } catch (error) {
         this.logger.info('🟡 NodeODM failed to start (optional service)');
