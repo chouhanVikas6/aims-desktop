@@ -156,8 +156,8 @@ class ServiceManager extends EventEmitter {
   getServicePaths() {
     this.logAllPaths(); // Log all paths for debugging
     const isPackaged = app.isPackaged;
-    const currentDir = process.resourcesPath;
-    const parentDir = isPackaged ? process.resourcesPath : path.dirname(currentDir);
+    const currentDir = isPackaged?process.resourcesPath : process.cwd()+'/resources';
+    const parentDir = isPackaged ? process.resourcesPath : path.dirname(currentDir)+'/resources';
     
     this.logger.info('🔍 ServiceManager Debug Info:');
     this.logger.info('   isPackaged:', isPackaged);
