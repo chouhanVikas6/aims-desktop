@@ -7,13 +7,16 @@ const { app } = require('electron');
 const fs = require('fs');
 const { getLogger } = require('../utils/logger');
 const util = require('util');
+const crypto = require('crypto');
 const execAsync = util.promisify(require('child_process').exec);
+require('../utils/polyfills'); // Load polyfills
 class ServiceManager extends EventEmitter {
   constructor() {
     super();
     this.services = new Map();
     this.isShuttingDown = false;
     this.logger = getLogger();
+    this.progressCount=1;
     
     this.logger.info('ServiceManager initialized');
   }
@@ -179,7 +182,7 @@ class ServiceManager extends EventEmitter {
         path: path.join(currentDir, '/'),
         port: 3000,
         healthEndpoint: '/auth/token-status',
-        startCommand: path.join(currentDir, '/aims-backend'),
+        startCommand: path.join(currentDir, 'aims-backend'),
         startArgs: ['start'],
         color: '🔵',
         required: true
@@ -199,8 +202,14 @@ class ServiceManager extends EventEmitter {
         path: path.join(currentDir, '/aims-frontend'),
         port: 3004,
         healthEndpoint: '/',
-        startCommand: 'PORT=3004 node',
-        startArgs: ['server.js'],
+        startCommand: process.execPath,  // Use Electron's node instead of system node
+        startArgs: [
+          path.join(__dirname, '../services/frontend-wrapper.js'),
+          `PORT=3004`,
+          'node',
+          'server.js'
+        ],
+        env: { PORT: '3004' },
         color: '🟢',
         required: true
       }
@@ -234,6 +243,18 @@ class ServiceManager extends EventEmitter {
         else reject(new Error(stderr || `Docker exited with code ${code}`));
       });
     });
+  }
+
+  async increaseProgressCount() {
+    this.progressCount++;
+    if(this.progressCount<30){
+      this.progressCount=30;
+    }else if(this.progressCount<70){
+      this.progressCount=70;
+    }else{
+      this.progressCount=90;
+    }
+    this.emit('startup-progress', this.progressCount, 'Starting services...');
   }
 
   // Add NodeODM Docker functions
@@ -317,7 +338,7 @@ class ServiceManager extends EventEmitter {
 
       this.emit('service-status', 'aims-ai', 'running', 'AimsAi Docker container is ready!');
       this.logger.info('🎉 AimsAi Docker container is ready!');
-
+      this.increaseProgressCount();
       return true;
 
     } catch (error) {
@@ -356,24 +377,32 @@ class ServiceManager extends EventEmitter {
         }
 
         // Start the service
-
-        const process = spawn(serviceConfig.startCommand, serviceConfig.startArgs, {
+        // Add environment variables to fix Node.js API issues
+        const env = { 
+          ...process.env, 
+          // NODE_OPTIONS: '--no-experimental-fetch --no-warnings',
+          NODE_PATH: path.join(process.cwd(), 'node_modules'),
+          ...(serviceConfig.env || {})  // Merge service-specific env vars
+        };
+        
+        const processAimsAi = spawn(serviceConfig.startCommand, serviceConfig.startArgs, {
           cwd: serviceConfig.path,
           shell: true,
           stdio: ['pipe', 'pipe', 'pipe'],
+          env: env
         });
 
         // Store process reference
         this.services.set(serviceKey, {
           ...serviceConfig,
-          process: process,
-          pid: process.pid,
+          process: processAimsAi,
+          pid: processAimsAi.pid,
           startTime: Date.now()
         });
 
-        this.logger.info(`${serviceConfig.color} ${serviceConfig.name} started with PID ${process.pid} and process ${JSON.stringify(process)}`);
+        this.logger.info(`${serviceConfig.color} ${serviceConfig.name} started with PID ${processAimsAi.pid}`);
         // Handle process events
-        process.on('error', (error) => {
+        processAimsAi.on('error', (error) => {
           console.error(`${serviceConfig.color} ${serviceConfig.name} error:`, error);
           this.emit('service-status', serviceKey, 'error', error.message);
           if (serviceConfig.required) {
@@ -383,21 +412,20 @@ class ServiceManager extends EventEmitter {
           }
         });
 
-        process.on('exit', (code) => {
+        processAimsAi.on('exit', (code) => {
           this.logger.info(`${serviceConfig.color} ${serviceConfig.name} exited with code ${code}`);
           this.services.delete(serviceKey);
           if (!this.isShuttingDown) {
             this.emit('service-status', serviceKey, 'stopped', `Service stopped (code: ${code})`);
           }
         });
-
         // Capture output
-        process.stdout.on('data', (data) => {
+        processAimsAi.stdout.on('data', (data) => {
           const output = data.toString();
           this.logServiceOutput(serviceConfig.name, 'STDOUT', output);
         });
 
-        process.stderr.on('data', (data) => {
+        processAimsAi.stderr.on('data', (data) => {
           const output = data.toString();
           
           // Log each line individually for better readability
@@ -422,6 +450,7 @@ class ServiceManager extends EventEmitter {
             clearInterval(checkReady);
             this.logger.info(`${serviceConfig.color} ${serviceConfig.name} is ready!`);
             this.emit('service-status', serviceKey, 'running', `${serviceConfig.name} is ready!`);
+            this.increaseProgressCount();
             resolve();
           } else if (attempts >= maxAttempts) {
             clearInterval(checkReady);
@@ -444,7 +473,7 @@ class ServiceManager extends EventEmitter {
 
   async startAllServices() {
     const servicePaths = this.getServicePaths();
-    
+
     try {
       this.emit('startup-progress', 0, 'Initializing services...');
       
@@ -454,13 +483,12 @@ class ServiceManager extends EventEmitter {
       
       this.emit('startup-progress', 40, 'Backend ready, starting NodeODM...');
       
-      // Start NodeODM (optional)
+      // Start NodeODM (optional) - skip if Docker not available
       try {
-        await this.startNodeODMDocker()
-        // await this.startService('nodeodm', servicePaths.nodeodm);
+        await this.startNodeODMDocker();
         this.emit('startup-progress', 70, 'NodeODM ready, starting frontend...');
       } catch (error) {
-        this.logger.info('🟡 NodeODM failed to start (optional service)');
+        this.logger.info('🟡 NodeODM failed to start (optional service):', error.message);
         this.emit('startup-progress', 70, 'NodeODM skipped, starting frontend...');
       }
       
@@ -470,6 +498,7 @@ class ServiceManager extends EventEmitter {
       this.emit('startup-progress', 100, 'All services ready!');
       this.emit('all-services-ready');
       return true;
+   
     } catch (error) {
       console.error('Failed to start services:', error);
       this.emit('startup-failed', error.message);
@@ -482,11 +511,23 @@ class ServiceManager extends EventEmitter {
     this.logger.info('🛑 Stopping all services...');
 
     const promises = [];
+    
     for (const [serviceKey, service] of this.services) {
       if (service.process && !service.process.killed) {
         promises.push(new Promise((resolve) => {
           this.logger.info(`${service.color} Stopping ${service.name}...`);
+          
+          // Set a timeout for force kill
+          const forceKillTimer = setTimeout(() => {
+            if (!service.process.killed) {
+              this.logger.warn(`${service.color} Force killing ${service.name} (didn't respond to SIGTERM)`);
+              kill(service.process.pid, 'SIGKILL', () => resolve());
+            }
+          }, 3000); // 3 second timeout
+          
+          // Try graceful shutdown first
           kill(service.process.pid, 'SIGTERM', (error) => {
+            clearTimeout(forceKillTimer);
             if (error) {
               console.error(`Error stopping ${service.name}:`, error);
             }

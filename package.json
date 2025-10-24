@@ -6,6 +6,9 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "postinstall": "npm run setup-backend-deps",
+    "setup-backend-deps": "mkdir -p resources/node_modules && cp -r node_modules/@vscode/sqlite3 resources/node_modules/sqlite3",
+    "prebuild": "npm run setup-backend-deps",
     "build": "electron-builder",
     "build:win": "electron-builder --win portable",
     "build:linux": "electron-builder --linux AppImage",
@@ -36,11 +39,16 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "node_modules/@vscode/sqlite3",
+        "to": "node_modules/sqlite3"
       }
     ],
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/@vscode/sqlite3/**/*"
     ],
     "win": {
       "target": "portable",
@@ -71,8 +79,12 @@
     }
   },
   "dependencies": {
+    "@vscode/sqlite3": "^5.1.8-vscode",
     "axios": "^1.12.2",
     "events": "^3.3.0",
     "tree-kill": "^1.2.2"
+  },
+  "browser": {
+    "crypto": false
   }
 }

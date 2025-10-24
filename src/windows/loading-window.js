@@ -1,4 +1,6 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const path = require('path');
+
 function createLoadingWindow() {
   const loadingWindow = new BrowserWindow({
     width: 800,
@@ -9,7 +11,8 @@ function createLoadingWindow() {
     resizable: false,
     webPreferences: {
       contextIsolation: true,
-      enableRemoteModule: false
+      enableRemoteModule: false,
+      preload: path.join(__dirname, '../preload.js')
     },
     show: false
   });
@@ -142,6 +145,28 @@ function createLoadingWindow() {
             @keyframes spin {
                 to { transform: rotate(360deg); }
             }
+            
+            .error-actions {
+                margin-top: 20px;
+                display: none;
+            }
+            
+            .btn {
+                background: rgba(255,255,255,0.2);
+                color: white;
+                border: 1px solid rgba(255,255,255,0.3);
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 0.9em;
+                margin: 5px;
+                transition: all 0.3s;
+            }
+            
+            .btn:hover {
+                background: rgba(255,255,255,0.3);
+                transform: translateY(-2px);
+            }
         </style>
     </head>
     <body>
@@ -171,12 +196,32 @@ function createLoadingWindow() {
             </div>
             
             <div class="spinner"></div>
+            
+            <div id="error-actions" class="error-actions">
+                <button class="btn" onclick="openLogFile()">📄 Open Log File</button>
+                <button class="btn" onclick="window.close()">✖ Close</button>
+            </div>
         </div>
         
         <script>
             function updateProgress(percent, text) {
                 document.getElementById('progress-fill').style.width = percent + '%';
                 document.getElementById('progress-text').textContent = text;
+                
+                // Show error actions if there's an error
+                if (text.toLowerCase().includes('failed') || text.toLowerCase().includes('timeout') || text.toLowerCase().includes('error')) {
+                    document.querySelector('.spinner').style.display = 'none';
+                    document.getElementById('error-actions').style.display = 'block';
+                }
+            }
+            
+            function openLogFile() {
+                // This will be handled by IPC if preload is available
+                if (window.electron && window.electron.openLogDirectory) {
+                    window.electron.openLogDirectory();
+                } else {
+                    alert('Please check the log file manually in your user data directory');
+                }
             }
             
             function updateServiceStatus(service, status, statusClass) {
