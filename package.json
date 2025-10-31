@@ -43,6 +43,10 @@
       {
         "from": "node_modules/@vscode/sqlite3",
         "to": "node_modules/sqlite3"
+      },
+      {
+        "from": "resources/node_modules/sqlite3",
+        "to": "node_modules/sqlite3"
       }
     ],
     "files": [

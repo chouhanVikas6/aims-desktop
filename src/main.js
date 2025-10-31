@@ -44,6 +44,25 @@ writeLog(`App Path: ${app.getAppPath()}`);
 writeLog(`Resources Path: ${process.resourcesPath}`);
 writeLog(`User Data: ${app.getPath('userData')}`);
 
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log('Another instance is already running. Quitting...');
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    } else if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.window.focus();
+    }
+  });
+}
+let isInitializing = false;
+let hasInitialized = false;
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -75,8 +94,115 @@ function createMainWindow() {
 }
 
 
+// Add IPC handler for opening log file
+// function showSplashAndInitialize() {
+//   // Create and show splash screen
+//   splashWindow = new SplashWindow();
+//   const splash = splashWindow.create();
+  
+//   splash.once('ready-to-show', () => {
+//     splashWindow.show();
+    
+//     // Start services after a short delay
+//     setTimeout(() => {
+//       // Initialize service manager
+//       serviceManager = new ServiceManager();
+
+//       // Handle service events - UPDATE SPLASH WINDOW
+//       serviceManager.on('startup-progress', (percent, message) => {
+//         console.log(`Progress: ${percent}% - ${message}`);
+//         if (splash && !splash.isDestroyed()) {
+//           splash.webContents.executeJavaScript(`
+//             window.updateProgress(${percent}, "${message}");
+//           `);
+//         }
+//       });
+      
+//       serviceManager.on('service-status', (service, status, message) => {
+//         console.log(`Service ${service}: ${status} - ${message}`);
+//         // You'll need to add updateServiceStatus function to splash if you want individual service status
+//         // For now, we can just show it in the progress text
+//         if (splash && !splash.isDestroyed()) {
+//           splash.webContents.executeJavaScript(`
+//             window.updateProgress("${service}: ${message}");
+//           `).catch(err => console.error('Error updating splash:', err));
+//         }
+//       });
+
+//       serviceManager.on('all-services-ready', () => {
+//         console.log('✅ All services are ready!');
+        
+//         // Create and show main window
+//         createMainWindow();
+        
+//         mainWindow.once('ready-to-show', () => {
+//           mainWindow.show();
+          
+//           // Close splash window (not loadingWindow!)
+//           if (splash && !splash.isDestroyed()) {
+//             splash.close();
+//           }
+//         });
+//       });
+      
+//       serviceManager.on('startup-failed', (error) => {
+//         console.error('❌ Service startup failed:', error);
+        
+//         // Show error dialog with log file location
+//         dialog.showErrorBox(
+//           'Service Startup Failed',
+//           `Failed to start services: ${error}\n\nCheck log file at:\n${logFilePath}`
+//         );
+        
+//         if (splash && !splash.isDestroyed()) {
+//           splash.webContents.executeJavaScript(`
+//             document.querySelector('.loading-dots').style.display = 'none';
+//             window.updateProgress(0, "Startup failed: ${error.replace(/"/g, '\\"')}");
+//           `);
+//         }
+//       });
+      
+//       // Start all services with error handling
+//       serviceManager.startAllServices().catch(error => {
+//         console.error('Fatal error starting services:', error);
+//         dialog.showErrorBox(
+//           'Fatal Error',
+//           `Could not start services: ${error.message}\n\nLog file: ${logFilePath}`
+//         );
+//       });
+      
+//       // Add a timeout to prevent infinite loading
+//       setTimeout(() => {
+//         if (!mainWindow || !mainWindow.isVisible()) {
+//           console.error('Services failed to start within 2 minutes');
+//           dialog.showErrorBox(
+//             'Startup Timeout',
+//             `Services failed to start within 2 minutes.\n\nLog file: ${logFilePath}\n\nTry:\n1. Close any existing AIMS Desktop processes\n2. Check if ports 3000/3004 are in use\n3. Run from command line to see errors`
+//           );
+          
+//           if (splash && !splash.isDestroyed()) {
+//             splash.webContents.executeJavaScript(`
+//               document.querySelector('.loading-dots').style.display = 'none';
+//               window.updateProgress(0, "Startup timeout - check logs");
+//             `);
+//           }
+//         }
+//       }, 120000); // 2 minute timeout
+      
+//     }, 1000); // 1 second delay
+//   });
+// }
 
 function showSplashAndInitialize() {
+  // Prevent multiple initializations
+  if (isInitializing || hasInitialized) {
+    console.log('Already initializing or initialized, skipping...');
+    return;
+  }
+  
+  isInitializing = true;
+  console.log('Starting splash and initialization...');
+  
   // Create and show splash screen
   splashWindow = new SplashWindow();
   const splash = splashWindow.create();
@@ -84,58 +210,61 @@ function showSplashAndInitialize() {
   splash.once('ready-to-show', () => {
     splashWindow.show();
     
-    // After 1 second, close splash and show main window
+    // Start services after a short delay
     setTimeout(() => {
-      // Create main window
-      if (!splashWindow.isDestroyed()) {
-        splashWindow.close();
+      // Initialize service manager only if not already created
+      if (!serviceManager) {
+        serviceManager = new ServiceManager();
       }
 
-      // Show loading screen and start services
-      const loadingWindow = createLoadingWindow();
-      loadingWindow.center();
-      loadingWindow.show();
-
-      // Initialize service manager
-      serviceManager = new ServiceManager();
-
-      // Handle service events
+      // Handle service events - UPDATE SPLASH WINDOW
       serviceManager.on('startup-progress', (percent, message) => {
         console.log(`Progress: ${percent}% - ${message}`);
-        if (loadingWindow && !loadingWindow.isDestroyed()) {
-          loadingWindow.webContents.executeJavaScript(`
-            window.updateProgress(${percent}, "${message}");
-          `);
+        if (splash && !splash.isDestroyed()) {
+          splash.webContents.executeJavaScript(`
+            if (window.updateProgress) {
+              window.updateProgress(${percent}, "${message}");
+            }
+          `).catch(err => console.error('Error updating progress:', err));
         }
       });
       
       serviceManager.on('service-status', (service, status, message) => {
         console.log(`Service ${service}: ${status} - ${message}`);
-        if (loadingWindow && !loadingWindow.isDestroyed()) {
-          loadingWindow.webContents.executeJavaScript(`
-            window.updateServiceStatus("${service}", "${status}", "status-${status}");
-          `);
+        if (splash && !splash.isDestroyed()) {
+          // Fixed: Added percent parameter
+          const estimatedPercent = status === 'running' ? 90 : status === 'starting' ? 50 : 10;
+          splash.webContents.executeJavaScript(`
+            if (window.updateProgress) {
+              window.updateProgress(${estimatedPercent}, "${service}: ${message}");
+            }
+          `).catch(err => console.error('Error updating service status:', err));
         }
       });
 
       serviceManager.on('all-services-ready', () => {
         console.log('✅ All services are ready!');
+        hasInitialized = true;
+        isInitializing = false;
         
         // Create and show main window
-        createMainWindow();
+        if (!mainWindow) {
+          createMainWindow();
+        }
         
         mainWindow.once('ready-to-show', () => {
           mainWindow.show();
           
-          // Close loading window
-          if (loadingWindow && !loadingWindow.isDestroyed()) {
-            loadingWindow.close();
+          // Close splash window
+          if (splash && !splash.isDestroyed()) {
+            splash.close();
           }
         });
       });
       
       serviceManager.on('startup-failed', (error) => {
         console.error('❌ Service startup failed:', error);
+        isInitializing = false;
         
         // Show error dialog with log file location
         dialog.showErrorBox(
@@ -143,46 +272,59 @@ function showSplashAndInitialize() {
           `Failed to start services: ${error}\n\nCheck log file at:\n${logFilePath}`
         );
         
-        if (loadingWindow && !loadingWindow.isDestroyed()) {
-          loadingWindow.webContents.executeJavaScript(`
-            document.querySelector('.spinner').style.display = 'none';
-            window.updateProgress(0, "Startup failed: ${error.replace(/"/g, '\\"')}");
-          `);
+        if (splash && !splash.isDestroyed()) {
+          splash.webContents.executeJavaScript(`
+            document.querySelector('.loading-dots').style.display = 'none';
+            if (window.updateProgress) {
+              window.updateProgress(0, "Startup failed: ${error.replace(/"/g, '\\"')}");
+            }
+          `).catch(err => console.error('Error showing error:', err));
         }
+        
+        // Quit app on startup failure
+        setTimeout(() => app.quit(), 3000);
       });
       
       // Start all services with error handling
       serviceManager.startAllServices().catch(error => {
         console.error('Fatal error starting services:', error);
+        isInitializing = false;
+        
         dialog.showErrorBox(
           'Fatal Error',
           `Could not start services: ${error.message}\n\nLog file: ${logFilePath}`
         );
+        
+        setTimeout(() => app.quit(), 2000);
       });
       
       // Add a timeout to prevent infinite loading
       setTimeout(() => {
         if (!mainWindow || !mainWindow.isVisible()) {
           console.error('Services failed to start within 2 minutes');
+          isInitializing = false;
+          
           dialog.showErrorBox(
             'Startup Timeout',
             `Services failed to start within 2 minutes.\n\nLog file: ${logFilePath}\n\nTry:\n1. Close any existing AIMS Desktop processes\n2. Check if ports 3000/3004 are in use\n3. Run from command line to see errors`
           );
           
-          if (loadingWindow && !loadingWindow.isDestroyed()) {
-            loadingWindow.webContents.executeJavaScript(`
-              document.querySelector('.spinner').style.display = 'none';
-              window.updateProgress(0, "Startup timeout - check log file");
-            `);
+          if (splash && !splash.isDestroyed()) {
+            splash.webContents.executeJavaScript(`
+              document.querySelector('.loading-dots').style.display = 'none';
+              if (window.updateProgress) {
+                window.updateProgress(0, "Startup timeout - check logs");
+              }
+            `).catch(err => console.error('Error showing timeout:', err));
           }
+          
+          setTimeout(() => app.quit(), 3000);
         }
       }, 120000); // 2 minute timeout
       
-    }, 2000); // 1 second delay
+    }, 1000); // 1 second delay
   });
 }
-
-// Add IPC handler for opening log file
 ipcMain.on('open-log-directory', () => {
   const userDataPath = app.getPath('userData');
   shell.openPath(userDataPath).catch(err => {
@@ -231,9 +373,20 @@ app.on('window-all-closed',async () => {
   }
 });
 
+// app.on('activate', () => {
+//   if (BrowserWindow.getAllWindows().length === 0) {
+//     showSplashAndInitialize();
+//   }
+// });
+
 app.on('activate', () => {
+  // On macOS, recreate window when dock icon is clicked and no windows exist
   if (BrowserWindow.getAllWindows().length === 0) {
-    showSplashAndInitialize();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    } else if (!isInitializing && !hasInitialized) {
+      showSplashAndInitialize();
+    }
   }
 });
 

@@ -2,130 +2,39 @@
 
 /**
  * Frontend Wrapper Script
- * 
- * This script creates a custom environment for the Next.js frontend
- * to run with all necessary Web APIs available.
+ * Runs the Next.js server with proper environment
  */
 
-// Add Web API polyfills
-if (typeof global.Request === 'undefined') {
-  class Request {
-    constructor(input, init) {
-      this.url = input;
-      this.method = (init && init.method) || 'GET';
-      this.headers = (init && init.headers) || {};
-      this.body = (init && init.body) || null;
-    }
-  }
-  
-  class Response {
-    constructor(body, init) {
-      this.body = body;
-      this.status = (init && init.status) || 200;
-      this.statusText = (init && init.statusText) || '';
-      this.headers = (init && init.headers) || {};
-    }
-    
-    json() {
-      return Promise.resolve(JSON.parse(this.body));
-    }
-    
-    text() {
-      return Promise.resolve(this.body);
-    }
-  }
-  
-  class Headers {
-    constructor(init) {
-      this._headers = {};
-      if (init) {
-        Object.keys(init).forEach(key => {
-          this._headers[key.toLowerCase()] = init[key];
-        });
-      }
-    }
-    
-    get(name) {
-      return this._headers[name.toLowerCase()];
-    }
-    
-    set(name, value) {
-      this._headers[name.toLowerCase()] = value;
-    }
-    
-    has(name) {
-      return !!this._headers[name.toLowerCase()];
-    }
-  }
-  
-  global.Request = Request;
-  global.Response = Response;
-  global.Headers = Headers;
-  global.fetch = function(url, options) {
-    return Promise.resolve(new Response('{}'));
-  };
-  
-  console.log('Added Web API polyfills');
+// Set up environment
+const port = process.env.PORT || '3004';
+console.log('Frontend wrapper starting on port:', port);
+
+// Get the server file path from command line
+const serverPath = process.argv[2];
+
+if (!serverPath) {
+  console.error('Server path not provided');
+  process.exit(1);
 }
 
-// Create a child process to run the frontend
-const { spawn } = require('child_process');
+console.log('Loading server from:', serverPath);
+
+// Change to the server's directory
 const path = require('path');
+const fs = require('fs');
 
-// Parse command line arguments
-const args = process.argv.slice(2);
-let env = {};
-let command = '';
-let commandArgs = [];
-
-// Extract environment variables (in the format KEY=VALUE)
-for (let i = 0; i < args.length; i++) {
-  if (args[i].includes('=')) {
-    const [key, value] = args[i].split('=');
-    env[key] = value;
-  } else {
-    command = args[i];
-    commandArgs = args.slice(i + 1);
-    break;
-  }
-}
-
-if (!command) {
-  console.error('Command not provided');
+if (!fs.existsSync(serverPath)) {
+  console.error(`Server file not found: ${serverPath}`);
   process.exit(1);
 }
 
-console.log(`Starting frontend: ${command} ${commandArgs.join(' ')}`);
-console.log('Environment:', env);
+process.chdir(path.dirname(serverPath));
 
-// Create environment variables
-const processEnv = {
-  ...process.env,
-  ...env,
-  NODE_OPTIONS: '--no-experimental-fetch --no-warnings',
-  NODE_PATH: path.join(process.cwd(), 'node_modules')
-};
-
-// Start the frontend process
-const frontendProcess = spawn(command, commandArgs, {
-  stdio: 'inherit',
-  env: processEnv
-});
-
-// Handle frontend process events
-frontendProcess.on('error', (err) => {
-  console.error(`Failed to start frontend: ${err.message}`);
+// Load and run the server
+try {
+  require(serverPath);
+  console.log('✅ Frontend server started successfully');
+} catch (error) {
+  console.error('❌ Failed to start frontend server:', error);
   process.exit(1);
-});
-
-frontendProcess.on('exit', (code) => {
-  console.log(`Frontend exited with code ${code}`);
-  process.exit(code);
-});
-
-// Forward signals to the child process
-['SIGINT', 'SIGTERM', 'SIGHUP'].forEach(signal => {
-  process.on(signal, () => {
-    frontendProcess.kill(signal);
-  });
-});
+}

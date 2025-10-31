@@ -169,12 +169,6 @@ class ServiceManager extends EventEmitter {
     this.logger.info('   app.getAppPath():', app.getAppPath());
     this.logger.info('   process.resourcesPath:', process.resourcesPath);
     this.logger.info('   process.execPath:', process.execPath);
-    // let debugmessage= "   currentDir: " + currentDir + "\n";
-    // debugmessage += "   parentDir: " + parentDir + "\n";
-    // debugmessage += "   __dirname: " + __dirname + "\n";
-    // debugmessage += "   app.getAppPath(): " + app.getAppPath() + "\n";
-    // debugmessage += "   process.resourcesPath: " + process.resourcesPath + "\n";
-    // debugmessage += "   process.execPath: " + process.execPath + "\n";
 
     return {
       backend: {
@@ -182,34 +176,34 @@ class ServiceManager extends EventEmitter {
         path: path.join(currentDir, '/'),
         port: 3000,
         healthEndpoint: '/auth/token-status',
-        startCommand: path.join(currentDir, 'aims-backend'),
-        startArgs: ['start'],
+        // USE WRAPPER with ELECTRON_RUN_AS_NODE
+        startCommand: process.execPath,
+        startArgs: [
+          path.join(__dirname, '../services/backend-wrapper.js'),
+          path.join(currentDir, 'aims-backend'),
+          'start'
+        ],
+        env: {
+          ELECTRON_RUN_AS_NODE: '1'  // Run Electron as Node.js
+        },
         color: '🔵',
         required: true
       },
-      // nodeodm: {
-      //   name: 'NodeODM',
-      //   path: path.join(parentDir, 'NodeODM'),
-      //   port: 3001,
-      //   healthEndpoint: '/info',
-      //   startCommand: 'npm',
-      //   startArgs: ['start'],
-      //   color: '🟡',
-      //   required: false
-      // },
+
       frontend: {
         name: 'Frontend', 
         path: path.join(currentDir, '/aims-frontend'),
         port: 3004,
         healthEndpoint: '/',
-        startCommand: process.execPath,  // Use Electron's node instead of system node
+        startCommand: process.execPath,  // Electron binary (has Node.js built-in)
         startArgs: [
           path.join(__dirname, '../services/frontend-wrapper.js'),
-          `PORT=3004`,
-          'node',
-          'server.js'
+          path.join(currentDir, '/aims-frontend/server.js')
         ],
-        env: { PORT: '3004' },
+        env: { 
+          PORT: '3004',
+          ELECTRON_RUN_AS_NODE: '1'  // ADD THIS - Critical!
+        },
         color: '🟢',
         required: true
       }
@@ -381,7 +375,7 @@ class ServiceManager extends EventEmitter {
         const env = { 
           ...process.env, 
           // NODE_OPTIONS: '--no-experimental-fetch --no-warnings',
-          NODE_PATH: path.join(process.cwd(), 'node_modules'),
+          NODE_PATH: path.join(serviceConfig.path, 'node_modules'),
           ...(serviceConfig.env || {})  // Merge service-specific env vars
         };
         

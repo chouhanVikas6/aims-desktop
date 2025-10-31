@@ -182,6 +182,34 @@ class SplashWindow {
                   font-size: 0.9em;
                   font-weight: 300;
               }
+
+              .progress-container {
+                margin: 30px 0;
+            }
+            
+            .progress-bar {
+                width: 100%;
+                height: 8px;
+                background: rgba(255,255,255,0.2);
+                border-radius: 4px;
+                overflow: hidden;
+                margin: 20px 0;
+            }
+            
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #4ade80, #22c55e);
+                width: 0%;
+                transition: width 0.5s ease;
+                box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            }
+            
+            .progress-text {
+                color: rgba(255,255,255,0.9);
+                font-size: 1em;
+                margin: 10px 0;
+            }
+            
           </style>
       </head>
       <body>
@@ -200,9 +228,38 @@ class SplashWindow {
                   <div class="dot"></div>
                   <div class="dot"></div>
               </div>
+               <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
           </div>
+         
           
           <div class="version">v1.0.0</div>
+
+          <script>
+            function updateProgress(percent, text="") {
+                const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        if (progressFill) {
+            progressFill.style.width = percent + '%';
+        }
+        
+        if (progressText && text) {
+            progressText.textContent = text;
+        }
+        
+        // Show error actions if there's an error
+        if (text.toLowerCase().includes('failed') || text.toLowerCase().includes('timeout') || text.toLowerCase().includes('error')) {
+            const dots = document.querySelector('.loading-dots');
+            if (dots) dots.style.display = 'none';
+        }
+            }
+            // Make functions available globally
+            window.updateProgress = updateProgress;
+        </script>
       </body>
       </html>
     `));
@@ -230,3 +287,5 @@ class SplashWindow {
 }
 
 module.exports = SplashWindow;
+
+// <div id="progress-text" class="progress-text">Initializing...</div>
