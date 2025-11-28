@@ -161,6 +161,7 @@ class ServiceManager extends EventEmitter {
     const isPackaged = app.isPackaged;
     const currentDir = isPackaged?process.resourcesPath : process.cwd()+'/resources';
     const parentDir = isPackaged ? process.resourcesPath : path.dirname(currentDir)+'/resources';
+    const backendBinaryName = process.platform === 'win32' ? 'aims-backend.exe' : 'aims-backend';
     
     this.logger.info('🔍 ServiceManager Debug Info:');
     this.logger.info('   isPackaged:', isPackaged);
@@ -180,7 +181,7 @@ class ServiceManager extends EventEmitter {
         startCommand: process.execPath,
         startArgs: [
           path.join(__dirname, '../services/backend-wrapper.js'),
-          path.join(currentDir, 'aims-backend'),
+          path.join(currentDir, backendBinaryName),
           'start'
         ],
         env: {
