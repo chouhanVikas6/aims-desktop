@@ -6,14 +6,11 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "postinstall": "npm run setup-backend-deps",
-    "setup-backend-deps": "mkdir -p resources/node_modules && cp -r node_modules/@vscode/sqlite3 resources/node_modules/sqlite3",
-    "prebuild": "npm run setup-backend-deps",
     "build": "electron-builder",
-    "build:win": "electron-builder --win portable",
+    "build:win": " electron-builder --win nsis",
     "build:linux": "electron-builder --linux AppImage",
     "build:mac": "electron-builder --mac",
-    "build:all": "electron-builder --win portable --linux AppImage",
+    "build:all": "electron-builder --win nsis --linux AppImage",
     "make": "npm run build:win"
   },
   "author": {
@@ -23,29 +20,32 @@
   "license": "MIT",
   "devDependencies": {
     "dmg-builder": "^24.13.3",
-    "electron": "^25.0.0",
+    "electron": "^39.2.4",
     "electron-builder": "^24.0.0"
   },
   "build": {
     "appId": "com.aims.desktop",
     "productName": "AIMS Desktop",
+    "npmRebuild": false,
+    "forceCodeSigning": false,
     "directories": {
       "output": "dist"
     },
     "extraResources": [
       {
-        "from": "resources/",
-        "to": ".",
-        "filter": [
-          "**/*"
-        ]
+        "from": "resources/aims-backend",
+        "to": "aims-backend"
+      },
+      {
+        "from": "resources/aims-backend.exe",
+        "to": "aims-backend.exe"
+      },
+      {
+        "from": "resources/aims-frontend",
+        "to": "aims-frontend"
       },
       {
         "from": "node_modules/@vscode/sqlite3",
-        "to": "node_modules/sqlite3"
-      },
-      {
-        "from": "resources/node_modules/sqlite3",
         "to": "node_modules/sqlite3"
       }
     ],
@@ -55,8 +55,8 @@
       "node_modules/@vscode/sqlite3/**/*"
     ],
     "win": {
-      "target": "portable",
-      "artifactName": "AIMS-Desktop-Portable.exe"
+      "target": "nsis",
+      "artifactName": "AIMS-Desktop-Setup.exe"
     },
     "linux": {
       "target": "AppImage",
@@ -86,6 +86,7 @@
     "@vscode/sqlite3": "^5.1.8-vscode",
     "axios": "^1.12.2",
     "events": "^3.3.0",
+    "sqlite3": "^5.1.7",
     "tree-kill": "^1.2.2"
   },
   "browser": {

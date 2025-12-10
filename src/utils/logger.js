@@ -6,15 +6,15 @@ class Logger {
   constructor() {
     // Create log file in temp directory or user home
     const logDir = path.join(os.homedir(), '.aims-desktop-logs');
-    
+
     // Ensure log directory exists
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
-    
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     this.logFile = path.join(logDir, `aims-desktop-${timestamp}.log`);
-    
+
     // Initialize log file
     this.writeToFile(`=== AIMS Desktop Log Started ===`);
     this.writeToFile(`Timestamp: ${new Date().toISOString()}`);
@@ -22,7 +22,7 @@ class Logger {
     this.writeToFile(`Node Version: ${process.version}`);
     this.writeToFile(`Log File: ${this.logFile}`);
     this.writeToFile(`===============================\n`);
-    
+
     console.log(`📝 Logging to: ${this.logFile}`);
   }
 
@@ -38,10 +38,10 @@ class Logger {
 
   log(level, message, ...args) {
     const formattedMessage = `${level.toUpperCase()}: ${message} ${args.length > 0 ? JSON.stringify(args) : ''}`;
-    
+
     // Write to console
     console.log(formattedMessage);
-    
+
     // Write to file
     this.writeToFile(formattedMessage);
   }
