@@ -26,10 +26,12 @@
   "build": {
     "appId": "com.aims.desktop",
     "productName": "AIMS Desktop",
+    "icon": "build/icons/256x256.png",
     "npmRebuild": false,
     "forceCodeSigning": false,
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "extraResources": [
       {
@@ -56,15 +58,18 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "AIMS-Desktop-Setup.exe"
+      "artifactName": "AIMS-Desktop-Setup.exe",
+      "icon": "build/icons/256x256.png"
     },
     "linux": {
       "target": "AppImage",
-      "artifactName": "AIMS-Desktop.AppImage"
+      "artifactName": "AIMS-Desktop.AppImage",
+      "icon": "build/icons/256x256.png"
     },
     "mac": {
       "target": "zip",
-      "artifactName": "AIMS-Desktop-macOS.zip"
+      "artifactName": "AIMS-Desktop-macOS.zip",
+      "icon": "build/icons/256x256.png"
     },
     "dmg": {
       "sign": false,
@@ -85,6 +90,7 @@
   "dependencies": {
     "@vscode/sqlite3": "^5.1.8-vscode",
     "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
     "events": "^3.3.0",
     "sqlite3": "^5.1.7",
     "tree-kill": "^1.2.2"

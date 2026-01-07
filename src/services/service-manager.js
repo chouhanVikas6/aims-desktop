@@ -184,7 +184,20 @@ class ServiceManager extends EventEmitter {
           path.join(currentDir, '/aims-backend/dist/main.js')
         ],
         env: {
-          ELECTRON_RUN_AS_NODE: '1'
+          ELECTRON_RUN_AS_NODE: '1',// Run Electron as Node.js
+          "AIMS_ADMIN": "http://192.168.0.176:3002",
+          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3005",
+          "CLOUD_ADMIN_ENCRYPTION_KEY": process.env.CLOUD_ADMIN_ENCRYPTION_KEY ,
+          "AIMSAT_URL": "http://localhost:3001",
+          "FRONTEND_URL": "http://localhost:3004",
+
+          "GOOGLE_CLIENT_ID": process.env.GOOGLE_CLIENT_ID ,
+          "GOOGLE_CLIENT_SECRET": process.env.GOOGLE_CLIENT_SECRET ,
+          "GOOGLE_REDIRECT_URI": "http://127.0.0.1:3000/auth/google-drive/callback",
+          "GOOGLE_DRIVE_MOCK": "false",
+
+          "NODE_ENV": "development",
+          "PORT": "3000"
         },
         color: '🔵',
         required: true
@@ -202,7 +215,20 @@ class ServiceManager extends EventEmitter {
           'start'
         ],
         env: {
-          ELECTRON_RUN_AS_NODE: '1'  // Run Electron as Node.js
+          ELECTRON_RUN_AS_NODE: '1',// Run Electron as Node.js
+          "AIMS_ADMIN": "http://192.168.0.176:3002",
+          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3005",
+          "CLOUD_ADMIN_ENCRYPTION_KEY": process.env.CLOUD_ADMIN_ENCRYPTION_KEY,
+          "AIMSAT_URL": "http://localhost:3001",
+          "FRONTEND_URL": "http://localhost:3004",
+
+          "GOOGLE_CLIENT_ID": process.env.GOOGLE_CLIENT_ID,
+          "GOOGLE_CLIENT_SECRET": process.env.GOOGLE_CLIENT_SECRET,
+          "GOOGLE_REDIRECT_URI": "http://localhost:3000/auth/google-drive/callback",
+          "GOOGLE_DRIVE_MOCK": "false",
+
+          "NODE_ENV": "development",
+          "PORT": "3000"
         },
         color: '🔵',
         required: true
@@ -269,15 +295,15 @@ class ServiceManager extends EventEmitter {
     this.emit('startup-progress', this.progressCount, 'Starting services...');
   }
 
-  // Add NodeODM Docker functions
-  async startNodeODMDocker() {
+  // Add AimsAi Docker functions
+  async startAimsAiDocker() {
     const dockerImage = 'opendronemap/nodeodm:latest';
     const containerName = 'AimsAi';
     const hostPort = 3001;
     const containerPort = 3000;
 
     try {
-      this.logger.info('🐳 Starting NodeODM with Docker...');
+      this.logger.info('🐳 Starting AimsAi with Docker...');
 
       // Check if Docker is available
       try {
@@ -290,18 +316,18 @@ class ServiceManager extends EventEmitter {
       try {
         await execAsync(`docker stop ${containerName}`);
         await execAsync(`docker rm ${containerName}`);
-        this.logger.info('🗑️ Removed existing NodeODM container');
+        this.logger.info('🗑️ Removed existing AimsAi container');
       } catch (error) {
         this.logger.info('ℹ️ No existing container to remove');
       }
 
       // Pull latest NodeODM image
-      this.logger.info('📥 Pulling NodeODM Docker image...');
-      this.emit('service-status', 'nodeodm', 'starting', 'Pulling Docker image...');
+      this.logger.info('📥 Pulling AimsAi Docker image...');
+      this.emit('service-status', 'aims-ai', 'starting', 'Pulling Docker image...');
 
       try {
         await execAsync(`docker pull ${dockerImage}`);
-        this.logger.info('✅ NodeODM image pulled successfully');
+        this.logger.info('✅ AimsAi image pulled successfully');
       } catch (error) {
         this.logger.warn('⚠️ Failed to pull image, using existing local image');
       }
@@ -314,7 +340,7 @@ class ServiceManager extends EventEmitter {
         fs.mkdirSync(AimsAiDataDir, { recursive: true });
         this.logger.info(`📁 Created aims-ai data directory: ${AimsAiDataDir}`);
       }
-      // Start NodeODM container
+      // Start AimsAi container
       const dockerArgs = [
         'run', '-d',
         '--name', containerName,
@@ -490,21 +516,25 @@ class ServiceManager extends EventEmitter {
 
       // Start backend first
       this.emit('startup-progress', 10, 'Starting backend service...');
-      await this.startService('backend', servicePaths.backend);
+      this.startService('backend', servicePaths.backend);
 
-      this.emit('startup-progress', 40, 'Backend ready, starting NodeODM...');
+      this.emit('startup-progress', 40, 'Backend ready, starting AimsAi...');
 
-      // Start NodeODM (optional) - skip if Docker not available
-      try {
-        await this.startNodeODMDocker();
-        this.emit('startup-progress', 70, 'NodeODM ready, starting frontend...');
-      } catch (error) {
-        this.logger.info('🟡 NodeODM failed to start (optional service):', error.message);
-        this.emit('startup-progress', 70, 'NodeODM skipped, starting frontend...');
-      }
+
 
       // Start frontend last
       await this.startService('frontend', servicePaths.frontend);
+      this.emit('startup-progress', 100, 'All services ready!');
+      this.emit('all-services-ready');
+
+      // Start AimsAi (optional) - skip if Docker not available
+      try {
+        await this.startAimsAiDocker();
+        // this.emit('startup-progress', 70, 'AimsAi ready, starting frontend...');
+      } catch (error) {
+        this.logger.info('🟡 AimsAi failed to start (optional service):', error.message);
+        this.emit('startup-progress', 70, 'AimsAi skipped, starting frontend...');
+      }
 
       this.emit('startup-progress', 100, 'All services ready!');
       this.emit('all-services-ready');

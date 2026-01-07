@@ -2,22 +2,22 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 
 function createLoadingWindow() {
-  const loadingWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    frame: false,
-    alwaysOnTop: true,
-    transparent: true,
-    resizable: false,
-    webPreferences: {
-      contextIsolation: true,
-      enableRemoteModule: false,
-      preload: path.join(__dirname, '../preload.js')
-    },
-    show: false
-  });
+    const loadingWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        frame: false,
+        alwaysOnTop: true,
+        transparent: true,
+        resizable: false,
+        webPreferences: {
+            contextIsolation: true,
+            enableRemoteModule: false,
+            preload: path.join(__dirname, '../preload.js')
+        },
+        show: false
+    });
 
-  loadingWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
+    loadingWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -186,8 +186,8 @@ function createLoadingWindow() {
                     <span id="backend-status" class="service-status status-waiting">Waiting</span>
                 </div>
                 <div class="service-item">
-                    <span class="service-name">🟡 NodeODM Service</span>
-                    <span id="nodeodm-status" class="service-status status-waiting">Waiting</span>
+                    <span class="service-name">🟡 AimsAi Service</span>
+                    <span id="aims-ai-status" class="service-status status-waiting">Waiting</span>
                 </div>
                 <div class="service-item">
                     <span class="service-name">🟢 Frontend Service</span>
@@ -240,6 +240,6 @@ function createLoadingWindow() {
     </html>
   `));
 
-  return loadingWindow;
+    return loadingWindow;
 }
 module.exports = { createLoadingWindow };

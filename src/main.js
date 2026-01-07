@@ -1,4 +1,7 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+// Load environment variables from .env file
+require('dotenv').config();
+
+const { app, BrowserWindow, dialog, ipcMain, shell, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const SplashWindow = require('./windows/splash-window');
@@ -6,6 +9,7 @@ const ServiceManager = require('./services/service-manager');
 const {createLoadingWindow} = require('./windows/loading-window');
 
 let mainWindow;
+let authWindow;
 let splashWindow;
 let serviceManager;
 
@@ -43,7 +47,10 @@ writeLog(`Log file: ${logFilePath}`);
 writeLog(`App Path: ${app.getAppPath()}`);
 writeLog(`Resources Path: ${process.resourcesPath}`);
 writeLog(`User Data: ${app.getPath('userData')}`);
-
+// if (process.platform === 'linux') {
+//   app.disableHardwareAcceleration();
+//   app.commandLine.appendSwitch('disable-gpu');
+// }
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -62,15 +69,35 @@ if (!gotTheLock) {
 }
 let isInitializing = false;
 let hasInitialized = false;
+// Fix icon path for both development and production
+function getIconPath() {
+  if (app.isPackaged) {
+    // In production, icon is in resources
+    return path.join(process.resourcesPath, 'build', 'icon.png');
+  } else {
+    // In development, icon is in project root/build
+    const devIconPath = path.join(__dirname, '../build/icon.png');
+    // Check if file exists, fallback to null if not found
+    if (fs.existsSync(devIconPath)) {
+      return devIconPath;
+    }
+    return null; // Will use default Electron icon if not found
+  }
+}
 
+const iconPath = getIconPath();
+console.log('Icon path:', iconPath);
+// app.setAppIcon(iconPath);
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    icon: path.join(__dirname, '../build/icons/256x256.png'),
     webPreferences: {
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: false
+      webSecurity: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
     title: 'ZOID - Aerial Image Management System',
     autoHideMenuBar: true,
@@ -332,7 +359,151 @@ ipcMain.on('open-log-directory', () => {
   });
 });
 
+// Google OAuth handler for desktop
+ipcMain.handle('google-oauth-authenticate', async (event, authUrl) => {
+  return new Promise((resolve) => {
+    console.log('Starting Google OAuth in BrowserWindow...');
+    console.log('Auth URL:', authUrl);
+    
+    // Close any existing auth window
+    if (authWindow && !authWindow.isDestroyed()) {
+      authWindow.close();
+    }
+
+    authWindow = new BrowserWindow({
+      width: 500,
+      height: 700,
+      parent: mainWindow,
+      modal: true,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+      title: 'Connect to Google Drive',
+      autoHideMenuBar: true,
+    });
+
+    authWindow.once('ready-to-show', () => {
+      authWindow.show();
+    });
+
+    // Track if we've already resolved
+    let resolved = false;
+    const resolveOnce = (result) => {
+      if (!resolved) {
+        resolved = true;
+        console.log('OAuth resolving with:', result);
+        if (authWindow && !authWindow.isDestroyed()) {
+          authWindow.close();
+        }
+        resolve(result);
+      }
+    };
+
+    // Helper to check URL and resolve if success/error detected
+    const checkUrlAndResolve = (url, navigationEvent) => {
+      console.log('OAuth checking URL:', url);
+      try {
+        const parsedUrl = new URL(url);
+        
+        // Check for success page - BLOCK navigation and resolve
+        if (parsedUrl.pathname.includes('google-drive-success')) {
+          console.log('OAuth success detected! Closing window...');
+          if (navigationEvent) navigationEvent.preventDefault();
+          // Small delay to ensure backend has saved tokens
+          setTimeout(() => resolveOnce({ success: true }), 500);
+          return true;
+        }
+
+        // Check for dashboard with success param (mock mode)
+        if (parsedUrl.pathname.includes('dashboard') && parsedUrl.searchParams.get('auth_success') === 'google_drive') {
+          console.log('OAuth success (mock mode) detected!');
+          if (navigationEvent) navigationEvent.preventDefault();
+          setTimeout(() => resolveOnce({ success: true }), 500);
+          return true;
+        }
+
+        // Check for error
+        if (parsedUrl.searchParams.get('auth_error') || parsedUrl.searchParams.get('error')) {
+          const error = parsedUrl.searchParams.get('auth_error') || parsedUrl.searchParams.get('error');
+          console.log('OAuth error detected:', error);
+          if (navigationEvent) navigationEvent.preventDefault();
+          resolveOnce({ success: false, error });
+          return true;
+        }
+      } catch (e) {
+        console.log('OAuth URL parse error:', e.message);
+      }
+      return false;
+    };
+
+    // Intercept navigation BEFORE it happens - this catches HTTP redirects
+    authWindow.webContents.on('will-navigate', (navEvent, url) => {
+      console.log('OAuth will-navigate:', url);
+      checkUrlAndResolve(url, navEvent);
+    });
+
+    // Catch HTTP redirects (302, etc.)
+    authWindow.webContents.on('will-redirect', (navEvent, url) => {
+      console.log('OAuth will-redirect:', url);
+      checkUrlAndResolve(url, navEvent);
+    });
+
+    // Check after navigation completes (catches JS redirects)
+    authWindow.webContents.on('did-navigate', (navEvent, url) => {
+      console.log('OAuth did-navigate:', url);
+      checkUrlAndResolve(url, null);
+    });
+
+    // Also check when page finishes loading (final fallback)
+    authWindow.webContents.on('did-finish-load', () => {
+      const url = authWindow.webContents.getURL();
+      console.log('OAuth did-finish-load:', url);
+      checkUrlAndResolve(url, null);
+    });
+
+    // Handle window closed by user
+    authWindow.on('closed', () => {
+      authWindow = null;
+      resolveOnce({ success: false, error: 'Window closed by user' });
+    });
+
+    // Load the auth URL
+    authWindow.loadURL(authUrl).catch(err => {
+      console.error('Failed to load OAuth URL:', err);
+      resolveOnce({ success: false, error: err.message });
+    });
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      resolveOnce({ success: false, error: 'Authentication timeout' });
+    }, 5 * 60 * 1000);
+  });
+});
 app.whenReady().then(() => {
+  // Set app icon (helps with Linux taskbar)
+  // if (iconPath && fs.existsSync(iconPath)) {
+  //   app.setAppIcon(iconPath);
+  // }
+  // Set up permission handlers for media devices (microphone, camera, screen capture)
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'mediaKeySystem', 'geolocation', 'notifications', 'fullscreen', 'pointerLock'];
+    if (allowedPermissions.includes(permission)) {
+      console.log(`Granting permission: ${permission}`);
+      callback(true);
+    } else {
+      console.log(`Denying permission: ${permission}`);
+      callback(false);
+    }
+  });
+
+  // Also handle permission check requests
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    const allowedPermissions = ['media', 'mediaKeySystem', 'geolocation', 'notifications', 'fullscreen', 'pointerLock'];
+    return allowedPermissions.includes(permission);
+  });
+
   showSplashAndInitialize();
 });
 
