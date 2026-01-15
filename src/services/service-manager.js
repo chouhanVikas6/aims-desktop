@@ -186,13 +186,13 @@ class ServiceManager extends EventEmitter {
         env: {
           ELECTRON_RUN_AS_NODE: '1',// Run Electron as Node.js
           "AIMS_ADMIN": "http://192.168.0.176:3002",
-          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3005",
-          "CLOUD_ADMIN_ENCRYPTION_KEY": process.env.CLOUD_ADMIN_ENCRYPTION_KEY ,
+          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3002",
+          "CLOUD_ADMIN_ENCRYPTION_KEY": process.env.CLOUD_ADMIN_ENCRYPTION_KEY,
           "AIMSAT_URL": "http://localhost:3001",
           "FRONTEND_URL": "http://localhost:3004",
 
-          "GOOGLE_CLIENT_ID": process.env.GOOGLE_CLIENT_ID ,
-          "GOOGLE_CLIENT_SECRET": process.env.GOOGLE_CLIENT_SECRET ,
+          "GOOGLE_CLIENT_ID": process.env.GOOGLE_CLIENT_ID,
+          "GOOGLE_CLIENT_SECRET": process.env.GOOGLE_CLIENT_SECRET,
           "GOOGLE_REDIRECT_URI": "http://127.0.0.1:3000/auth/google-drive/callback",
           "GOOGLE_DRIVE_MOCK": "false",
 
@@ -217,7 +217,7 @@ class ServiceManager extends EventEmitter {
         env: {
           ELECTRON_RUN_AS_NODE: '1',// Run Electron as Node.js
           "AIMS_ADMIN": "http://192.168.0.176:3002",
-          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3005",
+          "CLOUD_ADMIN_SERVER_URL": "http://192.168.0.176:3002",
           "CLOUD_ADMIN_ENCRYPTION_KEY": process.env.CLOUD_ADMIN_ENCRYPTION_KEY,
           "AIMSAT_URL": "http://localhost:3001",
           "FRONTEND_URL": "http://localhost:3004",
@@ -258,7 +258,7 @@ class ServiceManager extends EventEmitter {
     try {
       const response = await axios.get(
         `http://localhost:${serviceConfig.port}${serviceConfig.healthEndpoint}`,
-        { timeout: 3000 }
+        { timeout: 1000 }  // Reduced from 3000ms for faster checks
       );
       return response.status === 200;
     } catch (error) {
@@ -472,7 +472,7 @@ class ServiceManager extends EventEmitter {
         });
 
         // Wait for service to be ready
-        const maxAttempts = 60; // 2 minutes timeout
+        const maxAttempts = 120; // 60 seconds timeout (120 * 500ms)
         let attempts = 0;
 
         const checkReady = setInterval(async () => {
@@ -501,10 +501,12 @@ class ServiceManager extends EventEmitter {
               resolve();
             }
           } else {
-            // Update progress
-            this.emit('service-status', serviceKey, 'starting', `${serviceConfig.name} starting... (${attempts}/${maxAttempts})`);
+            // Update progress every 4 checks (2 seconds) to avoid log spam
+            if (attempts % 4 === 0) {
+              this.emit('service-status', serviceKey, 'starting', `${serviceConfig.name} starting... (${Math.floor(attempts / 2)}s elapsed)`);
+            }
           }
-        }, 2000);
+        }, 500);  // Check every 500ms for faster detection
       });
     });
   }
@@ -514,18 +516,14 @@ class ServiceManager extends EventEmitter {
     try {
       this.emit('startup-progress', 0, 'Initializing services...');
 
-      // Start backend first
+      // Start backend first - MUST await to ensure backend is ready before frontend
       this.emit('startup-progress', 10, 'Starting backend service...');
-      this.startService('backend', servicePaths.backend);
+      await this.startService('backend', servicePaths.backend);
+      this.emit('startup-progress', 50, 'Backend ready, starting frontend...');
 
-      this.emit('startup-progress', 40, 'Backend ready, starting AimsAi...');
-
-
-
-      // Start frontend last
+      // Start frontend only after backend is confirmed ready
       await this.startService('frontend', servicePaths.frontend);
-      this.emit('startup-progress', 100, 'All services ready!');
-      this.emit('all-services-ready');
+      this.emit('startup-progress', 90, 'All services ready!');
 
       // Start AimsAi (optional) - skip if Docker not available
       try {
@@ -584,4 +582,4 @@ class ServiceManager extends EventEmitter {
   }
 }
 
-module.exports = ServiceManager;
+module.exports = ServiceManager;  

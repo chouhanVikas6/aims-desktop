@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const SplashWindow = require('./windows/splash-window');
 const ServiceManager = require('./services/service-manager');
-const {createLoadingWindow} = require('./windows/loading-window');
+const { createLoadingWindow } = require('./windows/loading-window');
 
 let mainWindow;
 let authWindow;
@@ -106,7 +106,7 @@ function createMainWindow() {
 
   // Load your Next.js frontend
   const frontendURL = 'http://localhost:3004';
-  
+
   mainWindow.loadURL(frontendURL).catch(error => {
     console.error('Failed to load frontend:', error);
     // Load error page
@@ -126,10 +126,10 @@ function createMainWindow() {
 //   // Create and show splash screen
 //   splashWindow = new SplashWindow();
 //   const splash = splashWindow.create();
-  
+
 //   splash.once('ready-to-show', () => {
 //     splashWindow.show();
-    
+
 //     // Start services after a short delay
 //     setTimeout(() => {
 //       // Initialize service manager
@@ -144,7 +144,7 @@ function createMainWindow() {
 //           `);
 //         }
 //       });
-      
+
 //       serviceManager.on('service-status', (service, status, message) => {
 //         console.log(`Service ${service}: ${status} - ${message}`);
 //         // You'll need to add updateServiceStatus function to splash if you want individual service status
@@ -158,29 +158,29 @@ function createMainWindow() {
 
 //       serviceManager.on('all-services-ready', () => {
 //         console.log('✅ All services are ready!');
-        
+
 //         // Create and show main window
 //         createMainWindow();
-        
+
 //         mainWindow.once('ready-to-show', () => {
 //           mainWindow.show();
-          
+
 //           // Close splash window (not loadingWindow!)
 //           if (splash && !splash.isDestroyed()) {
 //             splash.close();
 //           }
 //         });
 //       });
-      
+
 //       serviceManager.on('startup-failed', (error) => {
 //         console.error('❌ Service startup failed:', error);
-        
+
 //         // Show error dialog with log file location
 //         dialog.showErrorBox(
 //           'Service Startup Failed',
 //           `Failed to start services: ${error}\n\nCheck log file at:\n${logFilePath}`
 //         );
-        
+
 //         if (splash && !splash.isDestroyed()) {
 //           splash.webContents.executeJavaScript(`
 //             document.querySelector('.loading-dots').style.display = 'none';
@@ -188,7 +188,7 @@ function createMainWindow() {
 //           `);
 //         }
 //       });
-      
+
 //       // Start all services with error handling
 //       serviceManager.startAllServices().catch(error => {
 //         console.error('Fatal error starting services:', error);
@@ -197,7 +197,7 @@ function createMainWindow() {
 //           `Could not start services: ${error.message}\n\nLog file: ${logFilePath}`
 //         );
 //       });
-      
+
 //       // Add a timeout to prevent infinite loading
 //       setTimeout(() => {
 //         if (!mainWindow || !mainWindow.isVisible()) {
@@ -206,7 +206,7 @@ function createMainWindow() {
 //             'Startup Timeout',
 //             `Services failed to start within 2 minutes.\n\nLog file: ${logFilePath}\n\nTry:\n1. Close any existing AIMS Desktop processes\n2. Check if ports 3000/3004 are in use\n3. Run from command line to see errors`
 //           );
-          
+
 //           if (splash && !splash.isDestroyed()) {
 //             splash.webContents.executeJavaScript(`
 //               document.querySelector('.loading-dots').style.display = 'none';
@@ -215,7 +215,7 @@ function createMainWindow() {
 //           }
 //         }
 //       }, 120000); // 2 minute timeout
-      
+
 //     }, 1000); // 1 second delay
 //   });
 // }
@@ -226,17 +226,18 @@ function showSplashAndInitialize() {
     console.log('Already initializing or initialized, skipping...');
     return;
   }
-  
+
   isInitializing = true;
   console.log('Starting splash and initialization...');
-  
+
   // Create and show splash screen
   splashWindow = new SplashWindow();
   const splash = splashWindow.create();
-  
+  splash.setAlwaysOnTop(false)
+
   splash.once('ready-to-show', () => {
     splashWindow.show();
-    
+
     // Start services after a short delay
     setTimeout(() => {
       // Initialize service manager only if not already created
@@ -255,7 +256,7 @@ function showSplashAndInitialize() {
           `).catch(err => console.error('Error updating progress:', err));
         }
       });
-      
+
       serviceManager.on('service-status', (service, status, message) => {
         console.log(`Service ${service}: ${status} - ${message}`);
         if (splash && !splash.isDestroyed()) {
@@ -273,32 +274,32 @@ function showSplashAndInitialize() {
         console.log('✅ All services are ready!');
         hasInitialized = true;
         isInitializing = false;
-        
+
         // Create and show main window
         if (!mainWindow) {
           createMainWindow();
         }
-        
+
         mainWindow.once('ready-to-show', () => {
           mainWindow.show();
-          
+
           // Close splash window
           if (splash && !splash.isDestroyed()) {
             splash.close();
           }
         });
       });
-      
+
       serviceManager.on('startup-failed', (error) => {
         console.error('❌ Service startup failed:', error);
         isInitializing = false;
-        
+
         // Show error dialog with log file location
         dialog.showErrorBox(
           'Service Startup Failed',
           `Failed to start services: ${error}\n\nCheck log file at:\n${logFilePath}`
         );
-        
+
         if (splash && !splash.isDestroyed()) {
           splash.webContents.executeJavaScript(`
             document.querySelector('.loading-dots').style.display = 'none';
@@ -307,35 +308,35 @@ function showSplashAndInitialize() {
             }
           `).catch(err => console.error('Error showing error:', err));
         }
-        
+
         // Quit app on startup failure
         setTimeout(() => app.quit(), 3000);
       });
-      
+
       // Start all services with error handling
       serviceManager.startAllServices().catch(error => {
         console.error('Fatal error starting services:', error);
         isInitializing = false;
-        
+
         dialog.showErrorBox(
           'Fatal Error',
           `Could not start services: ${error.message}\n\nLog file: ${logFilePath}`
         );
-        
+
         setTimeout(() => app.quit(), 2000);
       });
-      
+
       // Add a timeout to prevent infinite loading
       setTimeout(() => {
         if (!mainWindow || !mainWindow.isVisible()) {
           console.error('Services failed to start within 2 minutes');
           isInitializing = false;
-          
+
           dialog.showErrorBox(
             'Startup Timeout',
             `Services failed to start within 2 minutes.\n\nLog file: ${logFilePath}\n\nTry:\n1. Close any existing AIMS Desktop processes\n2. Check if ports 3000/3004 are in use\n3. Run from command line to see errors`
           );
-          
+
           if (splash && !splash.isDestroyed()) {
             splash.webContents.executeJavaScript(`
               document.querySelector('.loading-dots').style.display = 'none';
@@ -344,11 +345,11 @@ function showSplashAndInitialize() {
               }
             `).catch(err => console.error('Error showing timeout:', err));
           }
-          
+
           setTimeout(() => app.quit(), 3000);
         }
       }, 120000); // 2 minute timeout
-      
+
     }, 1000); // 1 second delay
   });
 }
@@ -511,12 +512,12 @@ let isQuitting = false;
 
 app.on('before-quit', async (event) => {
   if (isQuitting) return;
-  
+
   event.preventDefault();
   isQuitting = true;
-  
+
   console.log('🛑 Application quitting, cleaning up services...');
-  
+
   if (serviceManager) {
     try {
       await serviceManager.stopAllServices();
@@ -525,14 +526,14 @@ app.on('before-quit', async (event) => {
       console.error('❌ Error during cleanup:', error);
     }
   }
-  
+
   // Give processes time to die
   setTimeout(() => {
     app.exit(0);
   }, 1000);
 });
 
-app.on('window-all-closed',async () => {
+app.on('window-all-closed', async () => {
   if (process.platform !== 'darwin') {
     if (!isQuitting) {
       isQuitting = true;

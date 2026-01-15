@@ -11,7 +11,9 @@
     "build:linux": "electron-builder --linux AppImage",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win nsis --linux AppImage",
-    "make": "npm run build:win"
+    "make": "npm run build:win",
+    "install:backend:prod": "cd resources/aims-backend && npm ci --production --legacy-peer-deps",
+    "prebuild": "npm run install:backend:prod"
   },
   "author": {
     "name": "AIMS Team",
