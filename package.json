@@ -1,8 +1,8 @@
 {
   "name": "aims-desktop",
-  "productName": "AIMS Desktop",
+  "productName": "Aims 3D Desktop",
   "version": "1.0.0",
-  "description": "AIMS Desktop - Aerial Image Management System",
+  "description": "Aims 3D Desktop - Aerial Intelligence Mapping System",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -16,7 +16,7 @@
     "prebuild": "npm run install:backend:prod"
   },
   "author": {
-    "name": "AIMS Team",
+    "name": "Aims 3D Team",
     "email": "chouhanviky9@gmail.com"
   },
   "license": "MIT",
@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.aims.desktop",
-    "productName": "AIMS Desktop",
+    "productName": "Aims 3D Desktop",
     "icon": "build/icons/256x256.png",
     "npmRebuild": false,
     "forceCodeSigning": false,
@@ -60,17 +60,17 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "AIMS-Desktop-Setup.exe",
+      "artifactName": "Aims-3D-Desktop-Setup.exe",
       "icon": "build/icons/256x256.png"
     },
     "linux": {
       "target": "AppImage",
-      "artifactName": "AIMS-Desktop.AppImage",
+      "artifactName": "Aims-3D-Desktop.AppImage",
       "icon": "build/icons/256x256.png"
     },
     "mac": {
       "target": "zip",
-      "artifactName": "AIMS-Desktop-macOS.zip",
+      "artifactName": "Aims-3D-Desktop-macOS.zip",
       "icon": "build/icons/256x256.png"
     },
     "dmg": {

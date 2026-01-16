@@ -99,7 +99,7 @@ function createMainWindow() {
       webSecurity: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    title: 'ZOID - Aerial Image Management System',
+    title: 'ZOID - Aerial Intelligence Mapping System',
     autoHideMenuBar: true,
     show: false // Don't show until splash is done
   });
@@ -365,7 +365,7 @@ ipcMain.handle('google-oauth-authenticate', async (event, authUrl) => {
   return new Promise((resolve) => {
     console.log('Starting Google OAuth in BrowserWindow...');
     console.log('Auth URL:', authUrl);
-    
+
     // Close any existing auth window
     if (authWindow && !authWindow.isDestroyed()) {
       authWindow.close();
@@ -407,7 +407,7 @@ ipcMain.handle('google-oauth-authenticate', async (event, authUrl) => {
       console.log('OAuth checking URL:', url);
       try {
         const parsedUrl = new URL(url);
-        
+
         // Check for success page - BLOCK navigation and resolve
         if (parsedUrl.pathname.includes('google-drive-success')) {
           console.log('OAuth success detected! Closing window...');

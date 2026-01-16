@@ -2,26 +2,26 @@ const { BrowserWindow } = require('electron');
 const path = require('path');
 
 class SplashWindow {
-  constructor() {
-    this.window = null;
-  }
+    constructor() {
+        this.window = null;
+    }
 
-  create() {
-    this.window = new BrowserWindow({
-      width: 600,
-      height: 400,
-      frame: false, // Remove window frame for clean look
-      alwaysOnTop: true,
-      transparent: true,
-      resizable: false,
-      webPreferences: {
-        contextIsolation: true,
-        enableRemoteModule: false
-      },
-      show: false
-    });
+    create() {
+        this.window = new BrowserWindow({
+            width: 600,
+            height: 400,
+            frame: false, // Remove window frame for clean look
+            alwaysOnTop: true,
+            transparent: true,
+            resizable: false,
+            webPreferences: {
+                contextIsolation: true,
+                enableRemoteModule: false
+            },
+            show: false
+        });
 
-    this.window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
+        this.window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -221,7 +221,7 @@ class SplashWindow {
           
           <div class="splash-container">
               <div class="logo">ZOID</div>
-              <div class="tagline">AERIAL IMAGE MANAGEMENT SYSTEM</div>
+              <div class="tagline">AERIAL INTELLIGENCE MAPPING SYSTEM</div>
               
               <div class="loading-dots">
                   <div class="dot"></div>
@@ -264,26 +264,26 @@ class SplashWindow {
       </html>
     `));
 
-    return this.window;
-  }
-
-  show() {
-    if (this.window) {
-      this.window.center();
-      this.window.show();
+        return this.window;
     }
-  }
 
-  close() {
-    if (this.window) {
-      this.window.close();
-      this.window = null;
+    show() {
+        if (this.window) {
+            this.window.center();
+            this.window.show();
+        }
     }
-  }
 
-  isDestroyed() {
-    return !this.window || this.window.isDestroyed();
-  }
+    close() {
+        if (this.window) {
+            this.window.close();
+            this.window = null;
+        }
+    }
+
+    isDestroyed() {
+        return !this.window || this.window.isDestroyed();
+    }
 }
 
 module.exports = SplashWindow;
