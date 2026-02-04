@@ -1,9 +1,24 @@
 // Load environment variables from .env file
-require('dotenv').config();
-
-const { app, BrowserWindow, dialog, ipcMain, shell, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// Determine the correct path for .env file
+// In development: .env is in the project root
+// In production: .env is packaged with the app
+const envPath = path.join(__dirname, '../.env');
+console.log('Loading .env from:', envPath);
+console.log('.env exists:', fs.existsSync(envPath));
+
+require('dotenv').config({ path: envPath });
+
+// Log loaded environment variables (without exposing secrets)
+console.log('Environment variables loaded:');
+console.log('- GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✓ Set' : '✗ Not set');
+console.log('- GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✓ Set' : '✗ Not set');
+console.log('- CLOUD_ADMIN_ENCRYPTION_KEY:', process.env.CLOUD_ADMIN_ENCRYPTION_KEY ? '✓ Set' : '✗ Not set');
+
+
+const { app, BrowserWindow, dialog, ipcMain, shell, session, desktopCapturer } = require('electron');
 const SplashWindow = require('./windows/splash-window');
 const ServiceManager = require('./services/service-manager');
 const { createLoadingWindow } = require('./windows/loading-window');
@@ -99,7 +114,7 @@ function createMainWindow() {
       webSecurity: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    title: 'ZOID - Aerial Intelligence Mapping System',
+    title: 'ZOID - Aerial Intelligence Mapping Suite',
     autoHideMenuBar: true,
     show: false // Don't show until splash is done
   });
@@ -348,7 +363,7 @@ function showSplashAndInitialize() {
 
           setTimeout(() => app.quit(), 3000);
         }
-      }, 120000); // 2 minute timeout
+      }, 480000); // 8 minute timeout
 
     }, 1000); // 1 second delay
   });

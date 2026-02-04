@@ -196,7 +196,7 @@ class ServiceManager extends EventEmitter {
           "GOOGLE_REDIRECT_URI": "http://127.0.0.1:3000/auth/google-drive/callback",
           "GOOGLE_DRIVE_MOCK": "false",
 
-          "NODE_ENV": "development",
+          "NODE_ENV": "production",
           "PORT": "3000"
         },
         color: '🔵',
@@ -297,7 +297,7 @@ class ServiceManager extends EventEmitter {
 
   // Add AimsAi Docker functions
   async startAimsAiDocker() {
-    const dockerImage = 'opendronemap/nodeodm:latest';
+    const dockerImage = 'opendronemap/nodeodm:3.5.6';
     const containerName = 'AimsAi';
     const hostPort = 3001;
     const containerPort = 3000;
@@ -345,15 +345,9 @@ class ServiceManager extends EventEmitter {
         'run', '-d',
         '--name', containerName,
         '-p', `${hostPort}:${containerPort}`,
-        // '-v', `${AimsAiDataDir}:/var/www/data`, // This path is now safe
-        '--restart', 'unless-stopped',
-        '--memory', '4g',
-        '--cpus', '2',
         dockerImage,
-        '--max-images', '1000',
-        '--max-parallel-tasks', '1',
-        '--cleanup-uploads-after', '3',
-        '--max-concurrency', '2'
+        '--max-concurrency', '12',
+        '--memory=15g'
       ];
 
       this.logger.info(`🚀 Starting AimsAi container: docker ${dockerArgs.join(' ')}`);
@@ -472,7 +466,7 @@ class ServiceManager extends EventEmitter {
         });
 
         // Wait for service to be ready
-        const maxAttempts = 120; // 60 seconds timeout (120 * 500ms)
+        const maxAttempts = 240; // 120 seconds timeout (240 * 500ms)
         let attempts = 0;
 
         const checkReady = setInterval(async () => {
@@ -516,23 +510,26 @@ class ServiceManager extends EventEmitter {
     try {
       this.emit('startup-progress', 0, 'Initializing services...');
 
-      // Start backend first - MUST await to ensure backend is ready before frontend
-      this.emit('startup-progress', 10, 'Starting backend service...');
-      await this.startService('backend', servicePaths.backend);
-      this.emit('startup-progress', 50, 'Backend ready, starting frontend...');
-
-      // Start frontend only after backend is confirmed ready
-      await this.startService('frontend', servicePaths.frontend);
-      this.emit('startup-progress', 90, 'All services ready!');
 
       // Start AimsAi (optional) - skip if Docker not available
       try {
-        await this.startAimsAiDocker();
-        // this.emit('startup-progress', 70, 'AimsAi ready, starting frontend...');
+        this.startAimsAiDocker();
+        this.emit('startup-progress', 10, 'AimsAi ready, starting frontend...');
       } catch (error) {
         this.logger.info('🟡 AimsAi failed to start (optional service):', error.message);
-        this.emit('startup-progress', 70, 'AimsAi skipped, starting frontend...');
+        this.emit('startup-progress', 10, 'AimsAi skipped, starting frontend...');
       }
+
+      // Start backend first - MUST await to ensure backend is ready before frontend
+      this.emit('startup-progress', 20, 'Starting backend service...');
+      await this.startService('backend', servicePaths.backend);
+      this.emit('startup-progress', 40, 'Backend ready, starting frontend...');
+
+      // Start frontend only after backend is confirmed ready
+      await this.startService('frontend', servicePaths.frontend);
+      this.emit('startup-progress', 70, 'Frontend ready!');
+
+
 
       this.emit('startup-progress', 100, 'All services ready!');
       this.emit('all-services-ready');

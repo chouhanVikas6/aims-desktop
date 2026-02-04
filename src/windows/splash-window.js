@@ -221,7 +221,7 @@ class SplashWindow {
           
           <div class="splash-container">
               <div class="logo">ZOID</div>
-              <div class="tagline">AERIAL INTELLIGENCE MAPPING SYSTEM</div>
+              <div class="tagline">AERIAL INTELLIGENCE MAPPING SUITE</div>
               
               <div class="loading-dots">
                   <div class="dot"></div>
@@ -236,7 +236,7 @@ class SplashWindow {
           </div>
          
           
-          <div class="version">v1.0.0</div>
+          <div class="version">v1.3.2</div>
 
           <script>
             function updateProgress(percent, text="") {

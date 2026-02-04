@@ -2,7 +2,7 @@
   "name": "aims-desktop",
   "productName": "Aims 3D Desktop",
   "version": "1.0.0",
-  "description": "Aims 3D Desktop - Aerial Intelligence Mapping System",
+  "description": "Aims 3D Desktop - Aerial Intelligence Mapping Suite",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -56,6 +56,7 @@
     "files": [
       "src/**/*",
       "package.json",
+      ".env",
       "node_modules/@vscode/sqlite3/**/*"
     ],
     "win": {
